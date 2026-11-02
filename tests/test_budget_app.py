@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from budget_app.decorators import log_command, measure_execution_time
 from budget_app.errors import ValidationError
 from budget_app.service import BudgetService
 
@@ -87,6 +88,20 @@ class BudgetServiceTests(unittest.TestCase):
             rows = list(csv.DictReader(file))
         self.assertEqual("점심|회사", rows[0]["tags"])
         self.assertEqual("9000", rows[0]["amount"])
+
+    def test_logging_and_timing_decorators(self) -> None:
+        @log_command
+        @measure_execution_time
+        def sample_command() -> int:
+            return 0
+
+        with self.assertLogs("budget_app", level="INFO") as captured:
+            self.assertEqual(0, sample_command())
+
+        messages = "\n".join(captured.output)
+        self.assertIn("command_started", messages)
+        self.assertIn("command_finished", messages)
+        self.assertIn("command_timing", messages)
 
     def test_invalid_values_do_not_create_transaction(self) -> None:
         with self.assertRaises(ValidationError):
