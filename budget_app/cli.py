@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from .decorators import handle_cli_errors
+from .decorators import handle_cli_errors, log_command, measure_execution_time
 from .errors import ValidationError
 from .models import Transaction
 from .service import BudgetService
@@ -246,6 +246,8 @@ def dispatch(args: argparse.Namespace) -> int:
 
 
 @handle_cli_errors
+@log_command
+@measure_execution_time
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
