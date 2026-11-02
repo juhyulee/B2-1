@@ -78,16 +78,33 @@ class BudgetServiceTests(unittest.TestCase):
             writer.writerow(["2026-11-01", "expense", "식비", "9000", "점심", "점심|회사"])
             writer.writerow(["bad-date", "expense", "식비", "1000", "실패", ""])
 
-        imported, failed = self.service.import_csv(source)
-        self.assertEqual((1, 1), (imported, failed))
+        imported, failed, rolled_back = self.service.import_csv(source)
+        self.assertEqual((1, 1, False), (imported, failed, rolled_back))
+
+        atomic_imported, atomic_failed, rolled_back = self.service.import_csv(
+            source, atomic=True
+        )
+        self.assertEqual((0, 1, True), (atomic_imported, atomic_failed, rolled_back))
+        self.assertEqual(1, len(list(self.service.list_transactions())))
+
+        atomic_source = Path(self.temporary.name) / "atomic_source.csv"
+        with atomic_source.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["date", "type", "category", "amount", "memo", "tags"])
+            writer.writerow(["2026-11-02", "expense", "교통", "1500", "버스", "출근"])
+        atomic_imported, atomic_failed, rolled_back = self.service.import_csv(
+            atomic_source, atomic=True
+        )
+        self.assertEqual((1, 0, False), (atomic_imported, atomic_failed, rolled_back))
 
         output = Path(self.temporary.name) / "output.csv"
         exported = self.service.export_csv(output, month="2026-11")
-        self.assertEqual(1, exported)
+        self.assertEqual(2, exported)
         with output.open("r", encoding="utf-8-sig", newline="") as file:
             rows = list(csv.DictReader(file))
-        self.assertEqual("점심|회사", rows[0]["tags"])
-        self.assertEqual("9000", rows[0]["amount"])
+        lunch_row = next(row for row in rows if row["memo"] == "점심")
+        self.assertEqual("점심|회사", lunch_row["tags"])
+        self.assertEqual("9000", lunch_row["amount"])
 
     def test_logging_and_timing_decorators(self) -> None:
         @log_command
