@@ -100,11 +100,12 @@ date,type,category,amount,memo,tags
 
 ```bash
 python -m budget_app import --from ./sample.csv
+python -m budget_app import --from ./sample.csv --atomic
 python -m budget_app export --out ./november.csv --month 2026-11
 python -m budget_app export --out ./period.csv --from 2026-11-01 --to 2026-11-30
 ```
 
-가져오기는 유효한 행만 저장하고 성공/실패 건수를 출력합니다. 내보내기는 `--month` 또는 `--from`과 `--to` 조합 중 하나를 사용합니다.
+기본 가져오기는 유효한 행만 저장하고 성공/실패 건수를 출력하는 부분 반영 정책입니다. `--atomic`을 지정하면 모든 행을 먼저 검증하고, 하나라도 실패할 경우 0건을 저장하며 전체 취소 사실을 출력합니다. 모든 행이 유효하면 기존 거래와 신규 배치를 같은 디렉터리의 임시 파일에 기록하고 `fsync`한 뒤 `os.replace`로 한 번에 교체합니다. 기록 또는 교체 전에 오류가 나면 임시 파일만 삭제되므로 기존 거래 파일은 유지됩니다. 내보내기는 `--month` 또는 `--from`과 `--to` 조합 중 하나를 사용합니다.
 
 ## 저장 형식
 
