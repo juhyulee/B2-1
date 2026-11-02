@@ -193,7 +193,9 @@ class BudgetService:
             )
         self.stores.categories.remove(normalized)
 
-    def import_csv(self, source: Path) -> tuple[int, int]:
+    def import_csv(
+        self, source: Path, *, atomic: bool = False
+    ) -> tuple[int, int, bool]:
         if not source.exists():
             raise ValidationError(f"CSV 파일을 찾을 수 없습니다: {source}")
         valid: list[Transaction] = []
@@ -234,8 +236,13 @@ class BudgetService:
                     next_number += 1
                 except (ValidationError, KeyError, TypeError, ValueError):
                     failed += 1
-        imported = self.stores.transactions.add_many(iter(valid))
-        return imported, failed
+        if atomic and failed:
+            return 0, failed, True
+        if atomic:
+            imported = self.stores.transactions.add_many_atomic(iter(valid))
+        else:
+            imported = self.stores.transactions.add_many(iter(valid))
+        return imported, failed, False
 
     def export_csv(
         self,

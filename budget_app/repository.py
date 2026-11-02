@@ -129,6 +129,35 @@ class TransactionRepository:
     def add_many(self, transactions: Iterator[Transaction]) -> int:
         return self.store.append_many(t.to_dict() for t in transactions)
 
+    def add_many_atomic(self, transactions: Iterator[Transaction]) -> int:
+        """기존 거래와 신규 배치를 임시 파일에 쓴 뒤 한 번에 교체한다."""
+        path = self.store.path
+        descriptor, temp_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+        )
+        count = 0
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as target:
+                for transaction in self.iter_all():
+                    target.write(
+                        json.dumps(transaction.to_dict(), ensure_ascii=False) + "\n"
+                    )
+                for transaction in transactions:
+                    target.write(
+                        json.dumps(transaction.to_dict(), ensure_ascii=False) + "\n"
+                    )
+                    count += 1
+                target.flush()
+                os.fsync(target.fileno())
+            os.replace(temp_name, path)
+            return count
+        except Exception:
+            try:
+                os.unlink(temp_name)
+            except FileNotFoundError:
+                pass
+            raise
+
     def iter_all(self) -> Iterator[Transaction]:
         for row in self.store.iter_forward():
             yield Transaction.from_dict(row)

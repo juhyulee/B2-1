@@ -80,6 +80,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     import_parser = subparsers.add_parser("import", help="CSV 거래 가져오기")
     import_parser.add_argument("--from", required=True, dest="source", type=Path)
+    import_parser.add_argument(
+        "--atomic", action="store_true",
+        help="한 행이라도 실패하면 전체 가져오기를 취소",
+    )
 
     export_parser = subparsers.add_parser("export", help="CSV 거래 내보내기")
     export_parser.add_argument("--out", required=True, type=Path)
@@ -224,8 +228,16 @@ def dispatch(args: argparse.Namespace) -> int:
         service.delete_transaction(args.transaction_id)
         print(f"거래를 삭제했습니다: {args.transaction_id}")
     elif args.command == "import":
-        imported, failed = service.import_csv(args.source)
-        print(f"가져오기 완료: 성공 {imported}건, 실패 {failed}건")
+        imported, failed, rolled_back = service.import_csv(
+            args.source, atomic=args.atomic
+        )
+        if rolled_back:
+            print(
+                f"가져오기 전체 취소: 실패 {failed}건이 있어 "
+                "새로 저장된 거래는 없으며 기존 거래는 유지됩니다."
+            )
+        else:
+            print(f"가져오기 완료: 성공 {imported}건, 실패 {failed}건")
     elif args.command == "export":
         if args.month and (args.from_date or args.to_date):
             raise ValidationError(
